@@ -4,7 +4,7 @@
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
     <MicrosoftExtensionsVersion>8.6.0</MicrosoftExtensionsVersion>
     <AspireVersion>13.1.2</AspireVersion>
-    <MicrosoftExtensionsAiVersion>10.2.0</MicrosoftExtensionsAiVersion>
+    <MicrosoftExtensionsAiVersion>10.3.0</MicrosoftExtensionsAiVersion>
     <MicrosoftExtensionsAiEvaluationVersion>9.7.0</MicrosoftExtensionsAiEvaluationVersion>
   </PropertyGroup>
   <ItemGroup>

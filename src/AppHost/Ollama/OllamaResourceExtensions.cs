@@ -62,12 +62,7 @@ internal static class OllamaResourceExtensions
 
     private static string CreateVolumeName<T>(IResourceBuilder<T> builder, string suffix) where T : IResource
     {
-        // Ideally this would be public
-        return (string)typeof(ContainerResource).Assembly
-            .GetType("Aspire.Hosting.Utils.VolumeNameGenerator", true)!
-            .GetMethod("CreateVolumeName")!
-            .MakeGenericMethod(typeof(T))
-            .Invoke(null, [builder, suffix])!;
+        return $"{builder.Resource.Name}-{suffix}";
     }
 
     private sealed class OllamaEnsureModelAvailableHook(
