@@ -1,0 +1,43 @@
+<Solution>
+  <Folder Name="/seeddata/">
+    <Project Path="seeddata/DataGenerator/DataGenerator.csproj" />
+  </Folder>
+  <Folder Name="/seeddata/dev/">
+    <File Path="seeddata/dev/categories.json" />
+    <File Path="seeddata/dev/customers.json" />
+    <File Path="seeddata/dev/evalquestions.json" />
+    <File Path="seeddata/dev/manual-chunks.json" />
+    <File Path="seeddata/dev/manuals.zip" />
+    <File Path="seeddata/dev/products.json" />
+    <File Path="seeddata/dev/tickets.json" />
+  </Folder>
+  <Folder Name="/seeddata/test/">
+    <File Path="seeddata/test/categories.json" />
+    <File Path="seeddata/test/customers.json" />
+    <File Path="seeddata/test/evalquestions.json" />
+    <File Path="seeddata/test/manual-chunks.json" />
+    <File Path="seeddata/test/manuals.zip" />
+    <File Path="seeddata/test/products.json" />
+    <File Path="seeddata/test/tickets.json" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path="Directory.Packages.props" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/AppHost/AppHost.csproj" />
+    <Project Path="src/Backend/Backend.csproj" />
+    <Project Path="src/CustomerWebUI/CustomerWebUI.csproj" />
+    <Project Path="src/DataIngestor/DataIngestor.csproj" />
+    <Project Path="src/Evaluator/Evaluator.csproj" />
+    <Project Path="src/IdentityServer/IdentityServer.csproj" />
+    <Project Path="src/PythonInference/PythonInference.pyproj" Type="888888a0-9f3d-457c-b088-3a5042f75d52" Id="baa14585-1716-40fb-a04e-f986f1038638">
+      <Build Project="false" />
+    </Project>
+    <Project Path="src/ServiceDefaults/ServiceDefaults.csproj" />
+    <Project Path="src/StaffWebUI/StaffWebUI.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/E2ETest/E2ETest.csproj" />
+    <Project Path="test/EvaluationTests/EvaluationTests.csproj" />
+  </Folder>
+</Solution>
