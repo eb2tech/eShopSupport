@@ -2,6 +2,9 @@
 
   <PropertyGroup>
     <SuppressNETCoreSdkPreviewMessage>true</SuppressNETCoreSdkPreviewMessage>
+    <SuppressAspireWorkloadDeprecation>true</SuppressAspireWorkloadDeprecation>
+    <MSBuildTreatWarningsAsErrors>false</MSBuildTreatWarningsAsErrors>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NETSDK1228</WarningsNotAsErrors>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 

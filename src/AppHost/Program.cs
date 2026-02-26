@@ -1,6 +1,5 @@
 ﻿using Microsoft.Extensions.Configuration.Json;
 using Microsoft.Extensions.Hosting;
-using Projects;
 
 var builder = DistributedApplication.CreateBuilder(args);
 builder.Configuration.Sources.Add(new JsonConfigurationSource { Path = "appsettings.Local.json", Optional = true });
@@ -17,7 +16,7 @@ var backendDb = postgresServer
 var vectorDb = builder
     .AddQdrant("vector-db");
 
-var identityServer = builder.AddProject<IdentityServer>("identity-server")
+var identityServer = builder.AddProject("identity-server", "../IdentityServer/IdentityServer.csproj")
     .WithExternalHttpEndpoints();
 
 var identityEndpoint = identityServer
@@ -48,7 +47,7 @@ var pythonInference = builder.AddPythonUvicornApp("python-inference",
 
 var redis = builder.AddRedis("redis");
 
-var backend = builder.AddProject<Backend>("backend")
+var backend = builder.AddProject("backend", "../Backend/Backend.csproj")
     .WithReference(backendDb)
     .WithReference(chatCompletion)
     .WithReference(blobStorage)
@@ -58,13 +57,13 @@ var backend = builder.AddProject<Backend>("backend")
     .WithEnvironment("IdentityUrl", identityEndpoint)
     .WithEnvironment("ImportInitialDataDir", Path.Combine(builder.AppHostDirectory, "..", "..", "seeddata", isE2ETest ? "test" : "dev"));
 
-var staffWebUi = builder.AddProject<StaffWebUI>("staffwebui")
+var staffWebUi = builder.AddProject("staffwebui", "../StaffWebUI/StaffWebUI.csproj")
     .WithExternalHttpEndpoints()
     .WithReference(backend)
     .WithReference(redis)
     .WithEnvironment("IdentityUrl", identityEndpoint);
 
-var customerWebUi = builder.AddProject<CustomerWebUI>("customerwebui")
+var customerWebUi = builder.AddProject("customerwebui", "../CustomerWebUI/CustomerWebUI.csproj")
     .WithReference(backend)
     .WithEnvironment("IdentityUrl", identityEndpoint);
 
@@ -80,3 +79,6 @@ if (!isE2ETest)
 }
 
 builder.Build().Run();
+
+// Marker class for assembly discovery in tests (Aspire 13.x without workload)
+public static class AssemblyMarker { }

@@ -1,4 +1,5 @@
-﻿using Aspire.Hosting.Testing;
+﻿using Aspire.Hosting;
+using Aspire.Hosting.Testing;
 using eShopSupport.ServiceDefaults.Clients.Backend;
 using IdentityModel.Client;
 
@@ -18,11 +19,13 @@ public class AppHostFixture : IAsyncDisposable
 
     private async Task<DistributedApplication> InitializeAsync()
     {
-        Environment.CurrentDirectory = Projects.AppHost.ProjectPath;
+        var appHostProjectPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "AppHost"));
+        Environment.CurrentDirectory = appHostProjectPath;
         Environment.SetEnvironmentVariable("E2E_TEST", "true");
+        var e2eTestProjectPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", ".."));
         Environment.SetEnvironmentVariable("E2E_TEST_CHAT_COMPLETION_CACHE_DIR",
-            Path.Combine(Projects.E2ETest.ProjectPath, "ChatCompletionCache"));
-        var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.AppHost>();
+            Path.Combine(e2eTestProjectPath, "ChatCompletionCache"));
+        var builder = await DistributedApplicationTestingBuilder.CreateAsync(typeof(AssemblyMarker));
         var app = await builder.BuildAsync();
         await app.StartAsync();
 
