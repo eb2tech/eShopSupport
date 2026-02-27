@@ -5,7 +5,7 @@ using eShopSupport.Backend.Data;
 using eShopSupport.Backend.Services;
 using eShopSupport.ServiceDefaults.Clients.Backend;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.SemanticKernel.Embeddings;
+using Microsoft.Extensions.AI;
 
 namespace eShopSupport.Backend.Api;
 
@@ -23,7 +23,7 @@ public static class CatalogApi
             .RequireAuthorization(customerApiPolicy);
     }
 
-    private static async Task<IEnumerable<FindCategoriesResult>> SearchCategoriesAsync(AppDbContext dbContext, ITextEmbeddingGenerationService embedder, string? searchText, string? ids)
+    private static async Task<IEnumerable<FindCategoriesResult>> SearchCategoriesAsync(AppDbContext dbContext, IEmbeddingGenerator<string, Embedding<float>> embedder, string? searchText, string? ids)
     {
         IQueryable<ProductCategory> filteredCategories = dbContext.ProductCategories;
 
@@ -41,13 +41,13 @@ public static class CatalogApi
         // we have both a prefix match and a semantic match working together.
         if (!string.IsNullOrWhiteSpace(searchText))
         {
-            var searchTextEmbedding = await embedder.GenerateEmbeddingAsync(searchText);
+            var searchTextEmbedding = (await embedder.GenerateAsync([searchText])).Single();
             matchingCategories = matchingCategories.Select(c => new
             {
                 Category = c,
                 Similarity = c.Name.StartsWith(searchText, StringComparison.OrdinalIgnoreCase)
                                     ? 1f
-                                    : TensorPrimitives.CosineSimilarity(FromBase64(c.NameEmbeddingBase64), searchTextEmbedding.Span),
+                                    : TensorPrimitives.CosineSimilarity(FromBase64(c.NameEmbeddingBase64), searchTextEmbedding.Vector.Span),
             }).Where(x => x.Similarity > 0.5f)
                             .OrderByDescending(x => x.Similarity)
                             .Take(5)

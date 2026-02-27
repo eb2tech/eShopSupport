@@ -2,9 +2,9 @@
 using eShopSupport.Backend.Data;
 using eShopSupport.Backend.Services;
 using eShopSupport.ServiceDefaults.Clients.PythonInference;
+using Microsoft.Extensions.AI;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.SemanticKernel.Connectors.Qdrant;
-using Microsoft.SemanticKernel.Embeddings;
 using Microsoft.SemanticKernel.Memory;
 using SmartComponents.LocalEmbeddings.SemanticKernel;
 
@@ -20,13 +20,13 @@ builder.Services.AddScoped(s => new QdrantMemoryStore(
     s.GetQdrantHttpClient("vector-db"), 384));
 
 builder.Services.AddScoped<IMemoryStore>(s => s.GetRequiredService<QdrantMemoryStore>());
-builder.Services.AddScoped<ITextEmbeddingGenerationService, LocalTextEmbeddingGenerationService>();
+builder.Services.AddScoped<IEmbeddingGenerator<string, Embedding<float>>, LocalEmbeddingGeneratorAdapter>();
 builder.Services.AddScoped<ISemanticTextMemory, SemanticTextMemory>();
 builder.Services.AddScoped<ProductSemanticSearch>();
 builder.Services.AddScoped<ProductManualSemanticSearch>();
 builder.Services.AddScoped<TicketSummarizer>();
 builder.Services.AddHttpClient<PythonInferenceClient>(c => c.BaseAddress = new Uri("http://python-inference"));
-builder.AddAzureBlobClient("eshopsupport-blobs");
+builder.AddAzureBlobServiceClient("eshopsupport-blobs");
 
 builder.AddChatCompletionService("chatcompletion");
 builder.AddRedisClient("redis");

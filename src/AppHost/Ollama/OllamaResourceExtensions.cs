@@ -1,6 +1,7 @@
 ﻿using System.Net.Http.Json;
 using System.Text.Json;
 using Aspire.Hosting.Lifecycle;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Aspire.Hosting;
@@ -31,17 +32,70 @@ internal static class OllamaResourceExtensions
             ollama = ollama.WithContainerRuntimeArgs("--gpus=all");
         }
 
-        builder.Services.TryAddLifecycleHook<OllamaEnsureModelAvailableHook>();
+        var downloaderResource = new OllamaModelDownloaderResource($"ollama-model-downloader-{name}", resource);
 
         // This is a bit of a hack to show downloading models in the UI
-        builder.AddResource(new OllamaModelDownloaderResource($"ollama-model-downloader-{name}", resource))
+        builder.AddResource(downloaderResource)
             .WithInitialState(new()
             {
                 Properties = [],
                 ResourceType = "ollama downloader",
-                State = KnownResourceStates.Hidden
+                IsHidden = true
             })
             .ExcludeFromManifest();
+
+        ollama.OnResourceEndpointsAllocated(async (ollamaResource, @event, cancellationToken) =>
+        {
+            var context = @event.Services.GetRequiredService<DistributedApplicationExecutionContext>();
+            if (context.IsPublishMode)
+            {
+                return;
+            }
+
+            var loggerService = @event.Services.GetRequiredService<ResourceLoggerService>();
+            var notificationService = @event.Services.GetRequiredService<ResourceNotificationService>();
+            var logger = loggerService.GetLogger(downloaderResource);
+            var httpEndpoint = ollamaResource.GetEndpoint("http");
+            var client = new HttpClient();
+
+            _ = Task.Run(async () =>
+            {
+                // TODO: Make this resilient to failure
+                var ollamaModelsAvailable = await client.GetFromJsonAsync<OllamaGetTagsResponse>($"{httpEndpoint.Url}/api/tags", new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+                if (ollamaModelsAvailable is null)
+                {
+                    return;
+                }
+
+                var availableModelNames = ollamaModelsAvailable.Models?.Select(m => m.Name) ?? [];
+
+                var modelsToDownload = ollamaResource.Models.Except(availableModelNames);
+
+                if (!modelsToDownload.Any())
+                {
+                    return;
+                }
+
+                logger.LogInformation("Downloading models {Models} for ollama {OllamaName}...", string.Join(", ", modelsToDownload), ollamaResource.Name);
+
+                await notificationService.PublishUpdateAsync(downloaderResource, s => s with
+                {
+                    State = new("Downloading models...", KnownResourceStateStyles.Info)
+                });
+
+                await Parallel.ForEachAsync(modelsToDownload, async (modelName, ct) =>
+                {
+                    await DownloadModelAsync(logger, httpEndpoint, modelName, ct);
+                });
+
+                await notificationService.PublishUpdateAsync(downloaderResource, s => s with
+                {
+                    State = new("Models downloaded", KnownResourceStateStyles.Success)
+                });
+            },
+            cancellationToken);
+        });
 
         return ollama;
     }
@@ -65,91 +119,26 @@ internal static class OllamaResourceExtensions
         return $"{builder.Resource.Name}-{suffix}";
     }
 
-    private sealed class OllamaEnsureModelAvailableHook(
-        ResourceLoggerService loggerService,
-        ResourceNotificationService notificationService,
-        DistributedApplicationExecutionContext context) : IDistributedApplicationLifecycleHook
+    private static async Task DownloadModelAsync(ILogger logger, EndpointReference httpEndpoint, string? modelName, CancellationToken cancellationToken)
     {
-        public Task AfterEndpointsAllocatedAsync(DistributedApplicationModel appModel, CancellationToken cancellationToken = default)
+        logger.LogInformation("Pulling ollama model {ModelName}...", modelName);
+
+        var httpClient = new HttpClient { Timeout = TimeSpan.FromDays(1) };
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{httpEndpoint.Url}/api/pull") { Content = JsonContent.Create(new { name = modelName }) };
+        var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        var responseContentStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        var streamReader = new StreamReader(responseContentStream);
+        var line = (string?)null;
+        while ((line = await streamReader.ReadLineAsync(cancellationToken)) is not null)
         {
-            if (context.IsPublishMode)
-            {
-                return Task.CompletedTask;
-            }
-
-            var client = new HttpClient();
-
-            foreach (var downloader in appModel.Resources.OfType<OllamaModelDownloaderResource>())
-            {
-                var ollama = downloader.ollamaResource;
-
-                var logger = loggerService.GetLogger(downloader);
-
-                _ = Task.Run(async () =>
-                {
-                    var httpEndpoint = ollama.GetEndpoint("http");
-
-                    // TODO: Make this resilient to failure
-                    var ollamaModelsAvailable = await client.GetFromJsonAsync<OllamaGetTagsResponse>($"{httpEndpoint.Url}/api/tags", new JsonSerializerOptions(JsonSerializerDefaults.Web));
-
-                    if (ollamaModelsAvailable is null)
-                    {
-                        return;
-                    }
-
-                    var availableModelNames = ollamaModelsAvailable.Models?.Select(m => m.Name) ?? [];
-
-                    var modelsToDownload = ollama.Models.Except(availableModelNames);
-
-                    if (!modelsToDownload.Any())
-                    {
-                        return;
-                    }
-
-                    logger.LogInformation("Downloading models {Models} for ollama {OllamaName}...", string.Join(", ", modelsToDownload), ollama.Name);
-
-                    await notificationService.PublishUpdateAsync(downloader, s => s with
-                    {
-                        State = new("Downloading models...", KnownResourceStateStyles.Info)
-                    });
-
-                    await Parallel.ForEachAsync(modelsToDownload, async (modelName, ct) =>
-                    {
-                        await DownloadModelAsync(logger, httpEndpoint, modelName, ct);
-                    });
-
-                    await notificationService.PublishUpdateAsync(downloader, s => s with
-                    {
-                        State = new("Models downloaded", KnownResourceStateStyles.Success)
-                    });
-                },
-                cancellationToken);
-            }
-
-            return Task.CompletedTask;
+            logger.Log(LogLevel.Information, 0, line, null, (s, ex) => s);
         }
 
-        private static async Task DownloadModelAsync(ILogger logger, EndpointReference httpEndpoint, string? modelName, CancellationToken cancellationToken)
-        {
-            logger.LogInformation("Pulling ollama model {ModelName}...", modelName);
-
-            var httpClient = new HttpClient { Timeout = TimeSpan.FromDays(1) };
-            var request = new HttpRequestMessage(HttpMethod.Post, $"{httpEndpoint.Url}/api/pull") { Content = JsonContent.Create(new { name = modelName }) };
-            var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
-            var responseContentStream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            var streamReader = new StreamReader(responseContentStream);
-            var line = (string?)null;
-            while ((line = await streamReader.ReadLineAsync(cancellationToken)) is not null)
-            {
-                logger.Log(LogLevel.Information, 0, line, null, (s, ex) => s);
-            }
-
-            logger.LogInformation("Finished pulling ollama mode {ModelName}", modelName);
-        }
-
-        record OllamaGetTagsResponse(OllamaGetTagsResponseModel[]? Models);
-        record OllamaGetTagsResponseModel(string Name);
+        logger.LogInformation("Finished pulling ollama mode {ModelName}", modelName);
     }
+
+    record OllamaGetTagsResponse(OllamaGetTagsResponseModel[]? Models);
+    record OllamaGetTagsResponseModel(string Name);
 
     private class OllamaModelDownloaderResource(string name, OllamaResource ollamaResource) : Resource(name)
     {

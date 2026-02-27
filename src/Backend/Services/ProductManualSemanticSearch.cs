@@ -3,18 +3,18 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using Azure.Storage.Blobs;
 using eShopSupport.Backend.Data;
-using Microsoft.SemanticKernel.Embeddings;
+using Microsoft.Extensions.AI;
 using Microsoft.SemanticKernel.Memory;
 
 namespace eShopSupport.Backend.Services;
 
-public class ProductManualSemanticSearch(ITextEmbeddingGenerationService embedder, IServiceProvider services)
+public class ProductManualSemanticSearch(IEmbeddingGenerator<string, Embedding<float>> embedder, IServiceProvider services)
 {
     private const string ManualCollectionName = "manuals";
 
     public async Task<IReadOnlyList<MemoryQueryResult>> SearchAsync(int? productId, string query)
     {
-        var embedding = await embedder.GenerateEmbeddingAsync(query);
+        var embedding = (await embedder.GenerateAsync([query])).Single();
         var filter = !productId.HasValue
             ? null
             : new
@@ -29,7 +29,7 @@ public class ProductManualSemanticSearch(ITextEmbeddingGenerationService embedde
         var response = await httpClient.PostAsync($"collections/{ManualCollectionName}/points/search",
             JsonContent.Create(new
             {
-                vector = embedding,
+                vector = embedding.Vector.Span.ToArray(),
                 with_payload = new[] { "id", "text", "external_source_name", "additional_metadata" },
                 limit = 3,
                 filter,
